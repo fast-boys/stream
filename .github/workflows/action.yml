@@ -16,8 +16,8 @@ jobs:
 
       - name: Configure Git
         run: |
-          git config user.name "신창엽"
-          git config user.email "schy2504@naver.com"
+          git config --global user.name "신창엽"
+          git config --global user.email "schy2504@naver.com"
 
       - name: Install rsync
         run: sudo apt-get install rsync
