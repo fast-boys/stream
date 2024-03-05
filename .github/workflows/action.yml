@@ -32,6 +32,4 @@ jobs:
           rsync -av --exclude='.git/' --exclude='.github' ../ stream/
           git add .
           git commit -m "stream server develop update"
-          git fetch origin stream
-          git merge origin/stream --no-ff --allow-unrelated-histories -m "Merge remote changes"
           git push -u origin stream
