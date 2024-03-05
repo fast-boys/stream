@@ -1,0 +1,34 @@
+name: action
+
+on:
+  push:
+    branches:
+      - deploy
+
+jobs:
+  sync-to-gitlab:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "신창엽"
+          git config user.email "schy2504@naver.com"
+
+      - name: Install rsync
+        run: sudo apt-get install rsync
+
+      - name: Sync to Gitlab
+        env:
+          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+        run: |
+          git clone https://oauth2:$GITLAB_TOKEN@lab.ssafy.com/s10-bigdata-recom-sub2/S10P22D204.git .
+          git checkout -b stream
+          rsync -av --exclude='.git/' --exclude='.github' ../ stream/
+          git add .
+          git commit -m "stream server develop update"
+          git push -u origin stream
