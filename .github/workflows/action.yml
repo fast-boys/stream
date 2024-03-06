@@ -23,7 +23,7 @@ jobs:
         run: sudo apt-get install rsync
 
       - name: Configure merge strategy for pull
-        run: git config pull.rebase false
+        run: git config --global pull.rebase false
 
       - name: Sync to Gitlab
         env:
