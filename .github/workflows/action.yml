@@ -29,6 +29,7 @@ jobs:
           git clone https://oauth2:$GITLAB_TOKEN@lab.ssafy.com/s10-bigdata-recom-sub2/S10P22D204.git
           cd S10P22D204
           git checkout -b stream
+          git pull origin stream
           rsync -av --exclude='.git/' --exclude='.github' ../ stream/
           git add .
           git commit -m "stream server develop update"
