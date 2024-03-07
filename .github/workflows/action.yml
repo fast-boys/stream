@@ -30,7 +30,7 @@ jobs:
         env:
           GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
         run: |
-          git clone --branch strean https://oauth2:$GITLAB_TOKEN@lab.ssafy.com/s10-bigdata-recom-sub2/S10P22D204.git S10P22D204
+          git clone --branch stream https://oauth2:$GITLAB_TOKEN@lab.ssafy.com/s10-bigdata-recom-sub2/S10P22D204.git S10P22D204
           mkdir -p S10P22D204/stream
           rsync -av --delete --exclude='.git/' --exclude='.github/' ./stream/ S10P22D204/stream/
           cd S10P22D204
