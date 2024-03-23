@@ -64,7 +64,7 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
       
-      - name: Push Docker image with tage
+      - name: Push Docker image with tag
         uses: docker/build-push-action@v2
         with:
           context: .
@@ -100,6 +100,6 @@ jobs:
             --restart unless-stopped \
             ${{ secrets.DOCKERHUB_USERNAME }}/stream:v${{ github.run_number }}
             docker container prune -f
-            docker image prune -f
+            docker images | grep '${{ secrets.DOCKERHUB_USERNAME }}/stream' | grep -v 'v${{ github.run_number }}' | awk '{print $3}' | xargs -r docker rmi
             
 
