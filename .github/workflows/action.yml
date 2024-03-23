@@ -70,7 +70,7 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/stream
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/stream:${{ github.run_number }}
 
   deploy:
     needs: build-and-push
