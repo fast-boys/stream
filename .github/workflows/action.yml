@@ -93,7 +93,7 @@ jobs:
           script: |
             docker stop stream || true
             docker rm stream || true
-            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/stream:latest
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/stream:v${{ github.run_number }}
             docker run --name stream -d \
             -p 8082:8082 \
             --network=bridge \
