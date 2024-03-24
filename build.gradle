@@ -47,12 +47,13 @@ dependencies {
 	runtimeOnly 'org.mariadb.jdbc:mariadb-java-client'
 
 	// vault
-	implementation 'org.springframework.cloud:spring-cloud-starter-vault-config'
+	implementation 'org.springframework.cloud:spring-cloud-starter-vault-con fig'
 	implementation 'org.springframework.vault:spring-vault-core:3.1.1'
 	implementation 'org.springframework.cloud:spring-cloud-starter-bootstrap'
 
-	// websocket
-	implementation 'org.springframework.boot:spring-boot-starter-websocket'
+	// kafka
+	implementation 'org.springframework.kafka:spring-kafka'
+	testImplementation 'org.springframework.kafka:spring-kafka-test'
 }
 
 dependencyManagement {
