@@ -1,24 +1,64 @@
 plugins {
 	id 'java'
-	id 'org.springframework.boot' version '3.2.3'
+	id 'org.springframework.boot' version '3.2.4'
 	id 'io.spring.dependency-management' version '1.1.4'
 }
 
-group = 'com.fastravel'
+group = 'S10P22D204'
 version = '0.0.1-SNAPSHOT'
 
 java {
 	sourceCompatibility = '17'
 }
 
+configurations {
+	compileOnly {
+		extendsFrom annotationProcessor
+	}
+}
+
 repositories {
 	mavenCentral()
 }
 
+ext {
+	set('springCloudVersion', "2023.0.0")
+}
+
 dependencies {
+
+	// webflux reactor
 	implementation 'org.springframework.boot:spring-boot-starter-webflux'
-	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	testImplementation 'io.projectreactor:reactor-test'
+
+	// lombok
+	compileOnly 'org.projectlombok:lombok'
+	annotationProcessor 'org.projectlombok:lombok'
+
+	// spring boot
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+
+	// Spring Data R2DBC
+	implementation 'org.springframework.boot:spring-boot-starter-data-r2dbc'
+
+	// R2DBC MariaDB
+	implementation 'org.mariadb:r2dbc-mariadb:1.2.0'
+	runtimeOnly 'org.mariadb:r2dbc-mariadb:1.2.0'
+	runtimeOnly 'org.mariadb.jdbc:mariadb-java-client'
+
+	// vault
+	implementation 'org.springframework.cloud:spring-cloud-starter-vault-config'
+	implementation 'org.springframework.vault:spring-vault-core:3.1.1'
+	implementation 'org.springframework.cloud:spring-cloud-starter-bootstrap'
+
+	// websocket
+	implementation 'org.springframework.boot:spring-boot-starter-websocket'
+}
+
+dependencyManagement {
+	imports {
+		mavenBom "org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}"
+	}
 }
 
 tasks.named('test') {

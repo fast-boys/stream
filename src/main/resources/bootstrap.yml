@@ -1,5 +1,5 @@
 server:
-  port: 8082
+  port: 8081
 
 spring:
   config:
@@ -9,9 +9,9 @@ spring:
   cloud:
     vault:
       authentication: TOKEN
-      token: ${VAULT_TOKEN}
+      token: hvs.V6qMxopSJvpQ9ar4DBRuRDcj
       kv:
         enabled: true
         backend: spring
         default-context: application
-      uri: ${VAULT_ADDR}
+      uri: http://j10d204.p.ssafy.io:8200
