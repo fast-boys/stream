@@ -24,5 +24,5 @@ public class Users {
     private String nickname;
 
     @Column("profile_image")
-    private String profileImage = "profiles/defaultProfile.svg";
+    private String profileImage;
 }

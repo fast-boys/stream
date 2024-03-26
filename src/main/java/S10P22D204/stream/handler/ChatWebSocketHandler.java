@@ -1,5 +1,7 @@
 package S10P22D204.stream.handler;
 
+import S10P22D204.stream.common.exception.CustomException;
+import S10P22D204.stream.common.exception.ExceptionType;
 import S10P22D204.stream.dto.ChatUserDTO;
 import S10P22D204.stream.repository.ChatRepository;
 import S10P22D204.stream.repository.UsersRepository;
@@ -21,6 +23,17 @@ public class ChatWebSocketHandler implements WebSocketHandler {
     private final Map<Long, Map<String, WebSocketSession>> chatRooms = new ConcurrentHashMap<>();
     private final ChatRepository chatRepository;
     private final UsersRepository usersRepository;
+
+    @Override
+    public Mono<Void> handle(WebSocketSession session) {
+        return Mono.just(session)
+                .map(this::extractTravelId)
+                .switchIfEmpty(Mono.error(new CustomException(ExceptionType.CLIENT_ERROR)))
+                .doOnSuccess(travelId -> chatRooms.computeIfAbsent(travelId, k -> new ConcurrentHashMap<>()).put(session.getId(), session))
+                .flatMap(travelId -> getInitialMessages(travelId).collectList())
+                .flatMap(messages -> session.send(Flux.fromIterable(messages).map(this::serializeChatUserDtoToJson).map(session::textMessage)))
+                .onErrorResume(e -> handleException(session, e));
+    }
 
     private Long extractTravelId(WebSocketSession session) {
         String query = session.getHandshakeInfo().getUri().getQuery();
@@ -52,25 +65,26 @@ public class ChatWebSocketHandler implements WebSocketHandler {
                                 .userId(user.getId())
                                 .nickname(user.getNickname())
                                 .profileImage(user.getProfileImage())
+                                .providerId(user.getProviderId())
+                                .internalId(user.getInternalId())
                                 .build()
                         )
                 );
     }
 
-    @Override
-    public Mono<Void> handle(WebSocketSession session) {
-        Long travelId = extractTravelId(session);
-        chatRooms.computeIfAbsent(travelId, k -> new ConcurrentHashMap<>()).put(session.getId(), session);
-
-        Flux<ChatUserDTO> initialMessages = getInitialMessages(travelId);
-
-        return initialMessages.collectList().flatMap(list -> session.send(Flux.fromIterable(list)
-                .map(dto -> session.textMessage(serializeChatUserDtoToJson(dto)))
-        ));
-    }
-
     private String serializeChatUserDtoToJson(ChatUserDTO dto) {
-        return String.format("{\"chatId\": %d, \"message\": \"%s\", \"userId\": %d, \"nickname\": \"%s\", \"profileImage\": \"%s\"}",
-                dto.getChatId(), dto.getChatMessage(), dto.getUserId(), dto.getNickname(), dto.getProfileImage());
+        return String.format(
+                "{\"chatId\": %d, \"message\": \"%s\", \"userId\": %d, \"nickname\": \"%s\", \"profileImage\": \"%s\", \"providerId\": \"%s\", \"internalId\": \"%s\"}",
+                dto.getChatId(), dto.getChatMessage(), dto.getUserId(), dto.getNickname(), dto.getProfileImage(), dto.getProviderId(), dto.getInternalId()
+        );
     }
+
+    private Mono<Void> handleException(WebSocketSession session, Throwable e) {
+        String errorMsg = "An error occurred";
+        if (e instanceof CustomException) {
+            errorMsg = e.getMessage();
+        }
+        return session.send(Mono.just(session.textMessage("{\"error\":\"" + errorMsg + "\"}")));
+    }
+
 }

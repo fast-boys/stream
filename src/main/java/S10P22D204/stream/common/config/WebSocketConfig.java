@@ -1,4 +1,4 @@
-package S10P22D204.stream.config;
+package S10P22D204.stream.common.config;
 
 import S10P22D204.stream.handler.ChatWebSocketHandler;
 import S10P22D204.stream.repository.ChatRepository;

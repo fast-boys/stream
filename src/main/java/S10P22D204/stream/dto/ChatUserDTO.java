@@ -10,14 +10,14 @@ import java.time.LocalDateTime;
 @Setter
 @Builder
 public class ChatUserDTO {
-
-    // From Chat
     private Long chatId;
     private String chatMessage;
     private LocalDateTime createdAt;
 
-    // From Users
     private Long userId;
     private String nickname;
     private String profileImage;
+    private String providerId;
+    private String internalId;
 }
+
