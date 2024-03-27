@@ -2,6 +2,7 @@ package S10P22D204.stream.common.config;
 
 import S10P22D204.stream.handler.ChatWebSocketHandler;
 import S10P22D204.stream.repository.ChatRepository;
+import S10P22D204.stream.repository.UserPlanRepository;
 import S10P22D204.stream.repository.UsersRepository;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -35,8 +36,8 @@ public class WebSocketConfig {
     }
 
     @Bean
-    public ChatWebSocketHandler chatWebSocketHandler(ChatRepository chatRepository, UsersRepository usersRepository) {
-        return new ChatWebSocketHandler(chatRepository, usersRepository);
+    public ChatWebSocketHandler chatWebSocketHandler(ChatRepository chatRepository, UsersRepository usersRepository, UserPlanRepository userPlanRepository) {
+        return new ChatWebSocketHandler(chatRepository, usersRepository, userPlanRepository);
     }
 }
 

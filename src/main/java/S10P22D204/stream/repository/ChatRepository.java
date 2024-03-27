@@ -7,5 +7,5 @@ import reactor.core.publisher.Flux;
 
 @Repository
 public interface ChatRepository extends ReactiveCrudRepository<Chat, Long> {
-    Flux<Chat> findTop100ByTravelIdOrderByCreatedAtDesc(Long travelId);
+    Flux<Chat> findTop100ByPlanIdOrderByCreatedAtDesc(Long travelId);
 }

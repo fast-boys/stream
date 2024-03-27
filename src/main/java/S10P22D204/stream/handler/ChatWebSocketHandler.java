@@ -4,6 +4,7 @@ import S10P22D204.stream.common.exception.CustomException;
 import S10P22D204.stream.common.exception.ExceptionType;
 import S10P22D204.stream.dto.ChatUserDTO;
 import S10P22D204.stream.repository.ChatRepository;
+import S10P22D204.stream.repository.UserPlanRepository;
 import S10P22D204.stream.repository.UsersRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -11,8 +12,8 @@ import org.springframework.web.reactive.socket.WebSocketHandler;
 import org.springframework.web.reactive.socket.WebSocketSession;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.util.function.Tuples;
 
-import java.net.URI;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -23,23 +24,51 @@ public class ChatWebSocketHandler implements WebSocketHandler {
     private final Map<Long, Map<String, WebSocketSession>> chatRooms = new ConcurrentHashMap<>();
     private final ChatRepository chatRepository;
     private final UsersRepository usersRepository;
+    private final UserPlanRepository userPlanRepository;
 
     @Override
     public Mono<Void> handle(WebSocketSession session) {
-        return Mono.just(session)
-                .map(this::extractTravelId)
-                .switchIfEmpty(Mono.error(new CustomException(ExceptionType.CLIENT_ERROR)))
-                .doOnSuccess(travelId -> chatRooms.computeIfAbsent(travelId, k -> new ConcurrentHashMap<>()).put(session.getId(), session))
-                .flatMap(travelId -> getInitialMessages(travelId).collectList())
-                .flatMap(messages -> session.send(Flux.fromIterable(messages).map(this::serializeChatUserDtoToJson).map(session::textMessage)))
+        // Extract internalId from session headers
+        Mono<String> internalIdMono = Mono.justOrEmpty(session.getHandshakeInfo().getHeaders().getFirst("internalId"));
+
+        // Extract planId from query params
+        Mono<Long> planIdMono = Mono.justOrEmpty(extractPlanId(session))
+                .switchIfEmpty(Mono.error(new CustomException(ExceptionType.PLAN_ID_MISSING)));
+
+        // Combine internalId and planId into a tuple and process
+        return Mono.zip(internalIdMono, planIdMono, Tuples::of)
+                .flatMap(tuple -> {
+                    String internalId = tuple.getT1();
+                    Long planId = tuple.getT2();
+
+                    return usersRepository.findByInternalId(internalId) // Find user by internalId
+                            .switchIfEmpty(Mono.error(new CustomException(ExceptionType.USER_NOT_FOUND)))
+                            .onErrorResume(e -> Mono.error(new CustomException(ExceptionType.DATABASE_ERROR)))
+                            .flatMap(user ->
+                                    userPlanRepository.findByPlanIdAndUserId(planId, user.getId()) // Check if user belongs to the plan
+                                            .switchIfEmpty(Mono.error(new CustomException(ExceptionType.NOT_VALID_USER))) // Raise error if no association found
+                                            .onErrorResume(e -> Mono.error(new CustomException(ExceptionType.DATABASE_ERROR)))
+                                            .then(Mono.just(Tuples.of(planId, user)))
+                            );
+                })
+                .flatMap(tuple2 -> {
+                    Long planId = tuple2.getT1();
+                    // Logic to add user to chatRooms and send initial messages
+                    chatRooms.computeIfAbsent(planId, k -> new ConcurrentHashMap<>()).put(session.getId(), session);
+                    return getInitialMessages(planId).collectList()
+                            .flatMap(messages -> session.send(Flux.fromIterable(messages)
+                                    .map(this::serializeChatUserDtoToJson)
+                                    .map(session::textMessage)))
+                                    .onErrorResume(e -> Mono.error(new CustomException(ExceptionType.MESSAGE_SEND_FAILED)));
+                })
                 .onErrorResume(e -> handleException(session, e));
     }
 
-    private Long extractTravelId(WebSocketSession session) {
+    private Long extractPlanId(WebSocketSession session) {
         String query = session.getHandshakeInfo().getUri().getQuery();
         Map<String, String> queryParams = parseQueryParams(query);
-        String travelIdStr = queryParams.get("travelId");
-        return travelIdStr != null ? Long.parseLong(travelIdStr) : null;
+        String planIdStr = queryParams.get("planId");
+        return planIdStr != null ? Long.parseLong(planIdStr) : null;
     }
 
     private Map<String, String> parseQueryParams(String query) {
@@ -55,9 +84,11 @@ public class ChatWebSocketHandler implements WebSocketHandler {
         return queryParams;
     }
 
-    private Flux<ChatUserDTO> getInitialMessages(Long travelId) {
-        return chatRepository.findTop100ByTravelIdOrderByCreatedAtDesc(travelId)
+    private Flux<ChatUserDTO> getInitialMessages(Long planId) {
+        return chatRepository.findTop100ByPlanIdOrderByCreatedAtDesc(planId)
+                .onErrorResume(e -> Mono.error(new CustomException(ExceptionType.DATABASE_ERROR)))
                 .flatMap(chat -> usersRepository.findById(chat.getUserId())
+                        .onErrorResume(e -> Mono.error(new CustomException(ExceptionType.DATABASE_ERROR)))
                         .map(user -> ChatUserDTO.builder()
                                 .chatId(chat.getId())
                                 .chatMessage(chat.getChat())
