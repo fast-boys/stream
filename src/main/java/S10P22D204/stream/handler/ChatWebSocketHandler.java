@@ -9,6 +9,8 @@ import S10P22D204.stream.repository.ChatRepository;
 import S10P22D204.stream.repository.UserPlanRepository;
 import S10P22D204.stream.repository.UsersRepository;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.socket.WebSocketHandler;
@@ -16,7 +18,6 @@ import org.springframework.web.reactive.socket.WebSocketMessage;
 import org.springframework.web.reactive.socket.WebSocketSession;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.util.function.Tuples;
 
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -26,6 +27,9 @@ import java.util.concurrent.ConcurrentHashMap;
 @RequiredArgsConstructor
 public class ChatWebSocketHandler implements WebSocketHandler {
 
+    private static final Logger log = LoggerFactory.getLogger(ChatWebSocketHandler.class);
+
+
     private final Map<Long, Map<String, WebSocketSession>> chatRooms = new ConcurrentHashMap<>();
     private final Map<String, Long> sessionPlanMap = new ConcurrentHashMap<>();
     private final ChatRepository chatRepository;
@@ -34,7 +38,7 @@ public class ChatWebSocketHandler implements WebSocketHandler {
 
     @Override
     public Mono<Void> handle(WebSocketSession session) {
-        Mono<String> internalIdMono = Mono.justOrEmpty(session.getHandshakeInfo().getHeaders().getFirst("internalId"));
+        Mono<String> internalIdMono = Mono.justOrEmpty(session.getHandshakeInfo().getHeaders().getFirst("INTERNAL_ID_HEADER"));
         Mono<Long> planIdMono = Mono.justOrEmpty(extractPlanId(session))
                 .switchIfEmpty(Mono.error(new CustomException(ExceptionType.PLAN_ID_MISSING)));
 
@@ -70,10 +74,10 @@ public class ChatWebSocketHandler implements WebSocketHandler {
                                 .flatMap(tuple -> {
                                     Long planId = tuple.getT1();
                                     Users user = tuple.getT2();
-                                    return broadcastMessage(payload, planId, user);
+                                    return broadcastMessage(payload, planId, user, "text");
                                 });
                     } else if (message.getType() == WebSocketMessage.Type.BINARY) {
-                        System.out.println("File received. Service not ready.");
+                        log.error("File received. Service not ready.");
                         return Mono.empty();
 //                        return Mono.fromCallable(() -> Files.createTempFile("upload-", ".bin"))
 //                                .flatMap(path -> DataBufferUtils.write(Flux.just(message.getPayload()), path, StandardOpenOption.CREATE)
@@ -81,7 +85,8 @@ public class ChatWebSocketHandler implements WebSocketHandler {
 //                                .subscribeOn(Schedulers.boundedElastic());
                     }
                     return Mono.empty();
-                }).then();
+                })
+                .then();
 
         return initialSetup
                 .then(messageHandling)
@@ -102,40 +107,43 @@ public class ChatWebSocketHandler implements WebSocketHandler {
         }
     }
 
-    private Mono<Void> broadcastMessage(String message, Long planId, Users user) {
+    private Mono<Void> broadcastMessage(String message, Long planId, Users user, String type) {
         Chat chatMessage = new Chat();
         chatMessage.setUserId(user.getId());
         chatMessage.setPlanId(planId);
         chatMessage.setChat(message);
         chatMessage.setCreatedAt(LocalDateTime.now());
+        chatMessage.setType(type);
 
-        Mono<Void> saveToDb = chatRepository.save(chatMessage).then();
+        Mono<Chat> savedChatMono = chatRepository.save(chatMessage);
 
-        ChatUserDTO chatUserDTO = ChatUserDTO.builder()
-                .content(message)
-                .timestamp(chatMessage.getCreatedAt())
-                .userId(user.getId())
-                .sender(user.getNickname())
-                .profileImage(user.getProfileImage())
-                .build();
+        return savedChatMono.flatMap(savedChat -> {
+            ChatUserDTO chatUserDTO = ChatUserDTO.builder()
+                    .id(savedChat.getId()) // 저장된 메시지 ID 사용
+                    .content(savedChat.getChat())
+                    .timestamp(savedChat.getCreatedAt())
+                    .userId(user.getId())
+                    .sender(user.getNickname())
+                    .profileImage(user.getProfileImage())
+                    .type(type)
+                    .build();
 
-        Mono<Void> broadcast = Mono.justOrEmpty(chatRooms.get(planId))
-                .flatMapMany(sessions -> Flux.fromIterable(sessions.values()))
-                .flatMap(session ->
-                        session.send(Mono.just(session.textMessage(serializeChatUserDtoToJson(chatUserDTO))))
-                                .onErrorResume(e -> {
-                                    System.out.println("Error sending message to session " + session.getId() + ": " + e.getMessage());
-                                    return Mono.empty();
-                                })
-                ).then();
-
-        return saveToDb.then(broadcast);
+            return Mono.justOrEmpty(chatRooms.get(planId))
+                    .flatMapMany(sessions -> Flux.fromIterable(sessions.values()))
+                    .flatMap(session ->
+                            session.send(Mono.just(session.textMessage(serializeChatUserDtoToJson(chatUserDTO))))
+                                    .onErrorResume(e -> {
+                                        log.error("Error sending message to session {}: {}", session.getId(), e.getMessage());
+                                        return Mono.empty();
+                                    })
+                    ).then();
+        });
     }
 
     private Long extractPlanId(WebSocketSession session) {
         String query = session.getHandshakeInfo().getUri().getQuery();
         Map<String, String> queryParams = parseQueryParams(query);
-        String planIdStr = queryParams.get("planId");
+        String planIdStr = queryParams.get("plan");
         return planIdStr != null ? Long.parseLong(planIdStr) : null;
     }
 
@@ -176,8 +184,8 @@ public class ChatWebSocketHandler implements WebSocketHandler {
 
     private String serializeChatUserDtoToJson(ChatUserDTO dto) {
         return String.format(
-                "{\"id\": %d, \"content\": \"%s\", \"userId\": %d, \"sender\": \"%s\", \"profileImage\": \"%s\"}",
-                dto.getId(), dto.getContent(), dto.getUserId(), dto.getSender(), dto.getProfileImage()
+                "{\"id\": %d, \"content\": \"%s\", \"timestamp\": \"%s\", \"userId\": %d, \"sender\": \"%s\", \"profileImage\": \"%s\", \"type\": \"%s\"}",
+                dto.getId(), dto.getContent(), dto.getTimestamp().toString(), dto.getUserId(), dto.getSender(), dto.getProfileImage(), dto.getType()
         );
     }
 

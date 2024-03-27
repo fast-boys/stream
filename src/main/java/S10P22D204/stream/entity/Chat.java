@@ -25,6 +25,9 @@ public class Chat {
     @Column("chat")
     private String chat;
 
+    @Column("type")
+    private String type;
+
     @Column("created_at")
     private LocalDateTime createdAt;
 }
