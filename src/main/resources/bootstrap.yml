@@ -15,3 +15,11 @@ spring:
         backend: spring
         default-context: application
       uri: http://j10d204.p.ssafy.io:8200
+
+logging:
+  level:
+    org:
+      springframework:
+        web: DEBUG # Spring WebFlux의 디버그 로그 활성화
+    reactor:
+      netty: DEBUG # Reactor Netty의 디버그 로그 활성화
