@@ -5,7 +5,7 @@ spring:
   config:
     import: vault://
   application:
-    name: local
+    name: application
   cloud:
     vault:
       authentication: TOKEN
@@ -13,7 +13,7 @@ spring:
       kv:
         enabled: true
         backend: spring
-        default-context: local
+        default-context: application
       uri: http://j10d204.p.ssafy.io:8200
 
 logging:
